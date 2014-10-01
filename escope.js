@@ -332,6 +332,7 @@
     Variable.FunctionName = 'FunctionName';
     Variable.Variable = 'Variable';
     Variable.ImplicitGlobalVariable = 'ImplicitGlobalVariable';
+    Variable.ImportedBinding = 'ImportedBinding';
 
     function isStrictScope(scope, block) {
         var body, i, iz, stmt, expr;
@@ -980,6 +981,22 @@
 
                 case Syntax.IfStatement:
                     currentScope.__referencing(node.test);
+                    break;
+
+                case Syntax.ImportSpecifier:
+                    if (node.name) {
+                      currentScope.__define(node.name, {
+                        type: Variable.ImportedBinding,
+                        name: node.name,
+                        node: node
+                      });
+                    } else {
+                      currentScope.__define(node.id, {
+                        type: Variable.ImportedBinding,
+                        name: node.id,
+                        node: node
+                      });
+                    }
                     break;
 
                 case Syntax.Literal:
