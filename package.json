@@ -19,7 +19,7 @@
     "url": "http://github.com/Constellation/escope.git"
   },
   "dependencies": {
-    "estraverse": "thomasboyt/estraverse#8be12794b9038f1dc0ba9350f1cf32c89f1b20dd"
+    "estraverse": "salsify/estraverse#es6-modules"
   },
   "devDependencies": {
     "jshint": "~1.1.0",
