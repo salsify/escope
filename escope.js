@@ -983,20 +983,28 @@
                     currentScope.__referencing(node.test);
                     break;
 
+                case Syntax.ImportDefaultSpecifier:
+                    currentScope.__define(node.id, {
+                      type: Variable.ImportedBinding,
+                      name: node.id,
+                      node: node
+                    });
+                    break;
+
+                case Syntax.ImportNamespaceSpecifier:
+                    currentScope.__define(node.id, {
+                      type: Variable.ImportedBinding,
+                      name: node.id,
+                      node: node
+                    });
+                    break;
+
                 case Syntax.ImportSpecifier:
-                    if (node.name) {
-                      currentScope.__define(node.name, {
-                        type: Variable.ImportedBinding,
-                        name: node.name,
-                        node: node
-                      });
-                    } else {
-                      currentScope.__define(node.id, {
-                        type: Variable.ImportedBinding,
-                        name: node.id,
-                        node: node
-                      });
-                    }
+                    currentScope.__define(node.name, {
+                      type: Variable.ImportedBinding,
+                      name: node.name,
+                      node: node
+                    });
                     break;
 
                 case Syntax.Literal:
