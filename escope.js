@@ -832,6 +832,70 @@
         return node.type === Syntax.Program || node.type === Syntax.FunctionExpression || node.type === Syntax.FunctionDeclaration;
     };
 
+    function analyzeDeclarationPattern(type, node, pattern, index) {
+        var i, iz;
+
+        // XXX How to handle sub-indices?
+        switch (pattern.type) {
+        case Syntax.Identifier:
+            currentScope.variableScope.__define(pattern, {
+                type: type,
+                name: pattern,
+                node: node,
+                index: index
+            });
+            break;
+
+        case Syntax.SpreadElement:
+            analyzeDeclarationPattern(type, node, pattern.argument, index);
+            break;
+
+        case Syntax.ArrayPattern:
+            for (i = 0, iz = pattern.elements.length; i < iz; ++i) {
+                analyzeDeclarationPattern(type, node, pattern.elements[i], index);
+            }
+
+            break;
+
+        case Syntax.ObjectPattern:
+            for (i = 0, iz = pattern.properties.length; i < iz; ++i) {
+                analyzeDeclarationPattern(type, node, pattern.properties[i].value, index);
+            }
+
+            break;
+        }
+    }
+
+    function analyzeAssignmentPattern(assignment, pattern) {
+        var i, iz;
+
+        // XXX the RHS in the non-Identifier case doesn't necessarily correspond to an AST...
+        switch (pattern.type) {
+        case Syntax.ArrayPattern:
+            for (i = 0, iz = pattern.elements.length; i < iz; ++i) {
+                analyzeAssignmentPattern(assignment, pattern.elements[i]);
+            }
+            break;
+
+        case Syntax.ObjectPattern:
+            for (i = 0, iz = pattern.properties.length; i < iz; ++i) {
+                analyzeAssignmentPattern(assignment, pattern.properties[i].value);
+            }
+            break;
+
+        case Syntax.SpreadElement:
+            analyzeAssignmentPattern(assignment, pattern.argument);
+            break;
+
+        default:
+            if (assignment.operator === '=') {
+                currentScope.__referencing(pattern, Reference.WRITE, assignment.right, (!currentScope.isStrict && pattern.name != null) && assignment);
+            } else {
+                currentScope.__referencing(pattern, Reference.RW, assignment.right);
+            }
+        }
+    }
+
     /**
      * Main interface function. Takes an Esprima syntax tree and returns the
      * analyzed scopes.
@@ -854,24 +918,32 @@
         // attach scope and collect / resolve names
         estraverse.traverse(tree, {
             enter: function enter(node) {
-                var i, iz, decl;
+                var i, iz, j, jz, decl;
                 if (Scope.isScopeRequired(node)) {
                     new Scope(node, {});
                 }
 
                 switch (node.type) {
                 case Syntax.AssignmentExpression:
-                    if (node.operator === '=') {
-                        currentScope.__referencing(node.left, Reference.WRITE, node.right, (!currentScope.isStrict && node.left.name != null) && node);
-                    } else {
-                        currentScope.__referencing(node.left, Reference.RW, node.right);
-                    }
+                    analyzeAssignmentPattern(node, node.left);
                     currentScope.__referencing(node.right);
                     break;
 
                 case Syntax.ArrayExpression:
                     for (i = 0, iz = node.elements.length; i < iz; ++i) {
                         currentScope.__referencing(node.elements[i]);
+                    }
+                    break;
+
+                case Syntax.ArrayPattern:
+                    break;
+
+                case Syntax.ArrowFunctionExpression:
+                    for (i = 0, iz = node.params.length; i < iz; ++i) {
+                        analyzeDeclarationPattern(Variable.Parameter, node, node.params[i], i);
+                    }
+                    if (node.rest) {
+                        analyzeDeclarationPattern(Variable.Parameter, node, node.rest, i + 1);
                     }
                     break;
 
@@ -906,6 +978,18 @@
                     });
                     break;
 
+                case Syntax.ClassBody:
+                    // TODO
+                    break;
+
+                case Syntax.ClassDeclaration:
+                    // TODO
+                    break;
+
+                case Syntax.ClassExpression:
+                    // TODO
+                    break;
+
                 case Syntax.ConditionalExpression:
                     currentScope.__referencing(node.test);
                     currentScope.__referencing(node.consequent);
@@ -928,6 +1012,23 @@
                 case Syntax.EmptyStatement:
                     break;
 
+                case Syntax.ExportBatchSpecifier:
+                    break;
+
+                case Syntax.ExportDeclaration:
+                    if (!node.source) {
+                        for (i = 0, iz = node.specifiers.length; i < iz; ++i) {
+                            currentScope.__referencing(node.specifiers[i].id);
+                        }
+                    }
+                    if (node.default) {
+                        currentScope.__referencing(node.declaration);
+                    }
+                    break;
+
+                case Syntax.ExportSpecifier:
+                    break;
+
                 case Syntax.ExpressionStatement:
                     currentScope.__referencing(node.expression);
                     break;
@@ -947,6 +1048,10 @@
                     currentScope.__referencing(node.right);
                     break;
 
+                case Syntax.ForOfStatement:
+                    // TODO Is anything necessary here?
+                    break;
+
                 case Syntax.FunctionDeclaration:
                     // FunctionDeclaration name is defined in upper scope
                     currentScope.upper.__define(node.id, {
@@ -955,24 +1060,20 @@
                         node: node
                     });
                     for (i = 0, iz = node.params.length; i < iz; ++i) {
-                        currentScope.__define(node.params[i], {
-                            type: Variable.Parameter,
-                            name: node.params[i],
-                            node: node,
-                            index: i
-                        });
+                        analyzeDeclarationPattern(Variable.Parameter, node, node.params[i], i);
+                    }
+                    if (node.rest) {
+                        analyzeDeclarationPattern(Variable.Parameter, node, node.rest, i + 1);
                     }
                     break;
 
                 case Syntax.FunctionExpression:
                     // id is defined in upper scope
                     for (i = 0, iz = node.params.length; i < iz; ++i) {
-                        currentScope.__define(node.params[i], {
-                            type: Variable.Parameter,
-                            name: node.params[i],
-                            node: node,
-                            index: i
-                        });
+                        analyzeDeclarationPattern(Variable.Parameter, node, node.params[i], i);
+                    }
+                    if (node.rest) {
+                        analyzeDeclarationPattern(Variable.Parameter, node, node.rest, i + 1);
                     }
                     break;
 
@@ -981,6 +1082,9 @@
 
                 case Syntax.IfStatement:
                     currentScope.__referencing(node.test);
+                    break;
+
+                case Syntax.ImportDeclaration:
                     break;
 
                 case Syntax.ImportDefaultSpecifier:
@@ -1033,6 +1137,13 @@
                     }
                     break;
 
+                case Syntax.MethodDefinition:
+                    // TODO Need to check up on method self-reference semantics
+                    break;
+
+                case Syntax.ModuleSpecifier:
+                    break;
+
                 case Syntax.NewExpression:
                     currentScope.__referencing(node.callee);
                     for (i = 0, iz = node['arguments'].length; i < iz; ++i) {
@@ -1046,6 +1157,9 @@
                             currentScope.__referencing(node.properties[i].value);
                         }
                     }
+                    break;
+
+                case Syntax.ObjectPattern:
                     break;
 
                 case Syntax.Program:
@@ -1072,6 +1186,19 @@
                     currentScope.__referencing(node.test);
                     break;
 
+                case Syntax.TaggedTemplateExpression:
+                    currentScope.__referencing(node.tag);
+                    break;
+
+                case Syntax.TemplateElement:
+                    break;
+
+                case Syntax.TemplateLiteral:
+                    for (i = 0, iz = node.expressions.length; i < iz; ++i) {
+                        currentScope.__referencing(node.expressions[i]);
+                    }
+                    break;
+
                 case Syntax.ThisExpression:
                     currentScope.variableScope.__detectThis();
                     break;
@@ -1094,13 +1221,9 @@
                 case Syntax.VariableDeclaration:
                     for (i = 0, iz = node.declarations.length; i < iz; ++i) {
                         decl = node.declarations[i];
-                        currentScope.variableScope.__define(decl.id, {
-                            type: Variable.Variable,
-                            name: decl.id,
-                            node: decl,
-                            index: i,
-                            parent: node
-                        });
+
+                        analyzeDeclarationPattern(Variable.Variable, decl, decl.id, i);
+
                         if (decl.init) {
                             // initializer is found
                             currentScope.__referencing(decl.id, Reference.WRITE, decl.init, false);
@@ -1119,6 +1242,10 @@
                 case Syntax.WithStatement:
                     // WithStatement object is referenced at upper scope
                     currentScope.upper.__referencing(node.object);
+                    break;
+
+                case Syntax.YieldExpression:
+                    currentScope.__referencing(node.argument);
                     break;
                 }
             },
