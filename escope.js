@@ -1018,11 +1018,27 @@
                 case Syntax.ExportDeclaration:
                     if (!node.source) {
                         for (i = 0, iz = node.specifiers.length; i < iz; ++i) {
-                            currentScope.__referencing(node.specifiers[i].id);
+                            if (node.specifiers[i].type === Syntax.ExportSpecifier) {
+                                currentScope.__referencing(node.specifiers[i].id);
+                            } else if (node.specifiers[i].type === Syntax.Identifier) {
+                                currentScope.__referencing(node.specifiers[i]);
+                            }
                         }
                     }
-                    if (node.default) {
-                        currentScope.__referencing(node.declaration);
+                    switch (node.declaration && node.declaration.type) {
+                        case Syntax.VariableDeclaration:
+                            for (i = 0, iz = node.declaration.declarations.length; i < iz; ++i) {
+                                currentScope.__referencing(node.declaration.declarations[i].id);
+                            }
+                            break;
+
+                        case Syntax.FunctionDeclaration:
+                            currentScope.__referencing(node.declaration.id);
+                            break;
+
+                        case Syntax.Identifier:
+                            currentScope.__referencing(node.declaration);
+                            break;
                     }
                     break;
 
