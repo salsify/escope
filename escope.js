@@ -342,7 +342,7 @@
             return true;
         }
 
-        if (scope.type === 'function') {
+        if (scope.type === 'function' && block.body.type === Syntax.BlockStatement) {
             body = block.body;
         } else if (scope.type === 'global') {
             body = block;
@@ -829,7 +829,7 @@
     };
 
     Scope.isVariableScopeRequired = function isVariableScopeRequired(node) {
-        return node.type === Syntax.Program || node.type === Syntax.FunctionExpression || node.type === Syntax.FunctionDeclaration;
+        return node.type === Syntax.Program || node.type === Syntax.FunctionExpression || node.type === Syntax.FunctionDeclaration || node.type === Syntax.ArrowFunctionExpression;
     };
 
     function analyzeDeclarationPattern(type, node, pattern, index) {
