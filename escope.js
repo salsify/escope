@@ -1182,6 +1182,9 @@
                     break;
 
                 case Syntax.Property:
+                    if (node.computed) {
+                        currentScope.__referencing(node.key);
+                    }
                     break;
 
                 case Syntax.ReturnStatement:
