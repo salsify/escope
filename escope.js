@@ -1065,7 +1065,7 @@
                     break;
 
                 case Syntax.ForOfStatement:
-                    // TODO Is anything necessary here?
+                    currentScope.__referencing(node.right);
                     break;
 
                 case Syntax.FunctionDeclaration:
