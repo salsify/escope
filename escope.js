@@ -1197,6 +1197,10 @@
                     }
                     break;
 
+                case Syntax.SpreadElement:
+                    currentScope.__referencing(node.argument);
+                    break;
+
                 case Syntax.SwitchStatement:
                     currentScope.__referencing(node.discriminant);
                     break;
